@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useLayoutEffect, type ReactNode } from 'react'
+import { useState, useRef, useCallback, useLayoutEffect, type ReactNode, type TransitionEvent } from 'react'
 import clsx from 'clsx'
 import styles from './accordion.module.scss'
 
@@ -112,7 +112,9 @@ function AccordionSection({
         }
     }, [isOpen])
 
-    const handleTransitionEnd = () => {
+    const handleTransitionEnd = (event: TransitionEvent<HTMLDivElement>) => {
+        if (event.target !== event.currentTarget || event.propertyName !== 'height') return
+
         if (animState === 'opening') {
             setBodyHeight('auto')
             setAnimState('idle')
