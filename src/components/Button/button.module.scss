@@ -88,6 +88,25 @@
 }
 
 /* Sizes */
+.compact {
+    min-height: 35px;
+    padding: 0 10px;
+    gap: 6px;
+    border-radius: var(--ps-radius-sm);
+    font-size: 14px;
+    line-height: 15.4px;
+
+    &.primary,
+    &.outline {
+        outline-width: 2px;
+    }
+
+    .icon {
+        width: 16px;
+        height: 16px;
+    }
+}
+
 .sm {
     padding: 10px 18px;
     font-size: 13px;
@@ -164,6 +183,11 @@
     cursor: not-allowed;
     opacity: 0.5;
     pointer-events: none;
+}
+
+.sentenceCase {
+    text-transform: none;
+    font-weight: 700;
 }
 
 /* Icon */

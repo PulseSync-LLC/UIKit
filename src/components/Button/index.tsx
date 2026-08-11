@@ -3,7 +3,7 @@ import styles from './button.module.scss'
 import clsx from 'clsx'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'control'
-export type ButtonSize = 'sm' | 'md' | 'lg'
+export type ButtonSize = 'compact' | 'sm' | 'md' | 'lg'
 
 type BaseProps = {
     variant?: ButtonVariant
@@ -12,6 +12,8 @@ type BaseProps = {
     iconPosition?: 'left' | 'right'
     fullWidth?: boolean
     loading?: boolean
+    /** Keep the legacy uppercase label or use sentence case. */
+    uppercase?: boolean
     children?: ReactNode
 }
 
@@ -38,6 +40,7 @@ export function Button(props: ButtonProps) {
         iconPosition = 'left',
         fullWidth = false,
         loading = false,
+        uppercase = true,
         disabled,
         className,
         children,
@@ -50,6 +53,7 @@ export function Button(props: ButtonProps) {
         styles[size],
         fullWidth && styles.fullWidth,
         loading && styles.loading,
+        !uppercase && styles.sentenceCase,
         disabled && styles.disabled,
         className,
     )

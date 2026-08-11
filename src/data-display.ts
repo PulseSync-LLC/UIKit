@@ -3,3 +3,6 @@ export type { AvatarProps, AvatarGroupProps, AvatarSize, AvatarShape, AvatarStat
 
 export { Badge } from './components/Badge'
 export type { BadgeProps, BadgeVariant, BadgeSize } from './components/Badge'
+
+export { ContentCard } from './components/ContentCard'
+export type { ContentCardProps, ContentCardVariant } from './components/ContentCard'

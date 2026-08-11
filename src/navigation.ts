@@ -9,3 +9,6 @@ export type { PaginationProps } from './components/Pagination'
 
 export { Tabs, TabList, Tab, TabPanel } from './components/Tabs'
 export type { TabsProps, TabListProps, TabProps, TabPanelProps } from './components/Tabs'
+
+export { NavigationRail, NavigationRailItem } from './components/NavigationRail'
+export type { NavigationRailProps, NavigationRailItemProps } from './components/NavigationRail'

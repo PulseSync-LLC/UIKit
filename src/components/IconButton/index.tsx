@@ -4,7 +4,7 @@ import clsx from 'clsx'
 import styles from './iconButton.module.scss'
 
 export type IconButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger'
-export type IconButtonSize = 'sm' | 'md' | 'lg'
+export type IconButtonSize = 'compact' | 'sm' | 'md' | 'lg'
 
 export type IconButtonProps = {
     /** Icon content (e.g. SVG) */

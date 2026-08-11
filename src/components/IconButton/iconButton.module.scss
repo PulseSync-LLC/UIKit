@@ -85,6 +85,17 @@
 }
 
 /* Sizes */
+.compact {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+
+    .icon {
+        width: 20px;
+        height: 20px;
+    }
+}
+
 .sm {
     width: 32px;
     height: 32px;

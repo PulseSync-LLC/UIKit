@@ -10,7 +10,7 @@ import {
 import styles from './avatar.module.scss'
 import clsx from 'clsx'
 
-export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+export type AvatarSize = 'xs' | 'sm' | 'compact' | 'md' | 'lg' | 'xl'
 export type AvatarShape = 'rounded' | 'circle' | 'square'
 export type AvatarStatus = 'online' | 'offline' | 'busy' | 'away'
 
