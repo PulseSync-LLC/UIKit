@@ -25,8 +25,6 @@
 }
 
 .menuRight {
-    left: auto;
-    right: 0;
     transform-origin: top right;
 }
 
@@ -69,7 +67,7 @@
     font-weight: 600;
     line-height: 140%;
     cursor: pointer;
-    transition: background 0.01s ease;
+    transition: background 0.12s cubic-bezier(0.16, 1, 0.3, 1), color 0.12s ease;
     user-select: none;
 
     &:hover {
@@ -77,29 +75,9 @@
     }
 }
 
-/* Parent with open submenu — stronger highlight */
+/* Parent with open submenu — neutral highlight */
 .itemActive {
-    background: var(--ps-surface-secondary, var(--surface-secondary, rgba(255, 255, 255, 0.1)));
-
-    &::after {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 3px;
-        background: var(--ps-accent, var(--accent, #6D4CF3));
-        border-radius: 0 2px 2px 0;
-    }
-}
-
-/* Active bar on the right side for left-opening items */
-.itemReverse.itemActive {
-    &::after {
-        left: auto;
-        right: 0;
-        border-radius: 2px 0 0 2px;
-    }
+    background: var(--ps-hover, var(--hover, rgba(255, 255, 255, 0.06)));
 }
 
 .itemDisabled {
@@ -199,13 +177,13 @@
 .radioDot {
     width: 0;
     height: 0;
-    background: var(--ps-accent, var(--accent, #6D4CF3));
+    background: var(--ps-text-primary, var(--text-primary, #ffffff));
     border-radius: 50%;
     transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .radioChecked {
-    border-color: var(--ps-accent, var(--accent, #6D4CF3));
+    border-color: var(--ps-text-primary, var(--text-primary, #ffffff));
 
     .radioDot {
         width: 8px;
@@ -231,7 +209,10 @@
     top: -6px;
     z-index: 2001;
     min-width: 200px;
+    max-height: min(420px, calc(100vh - 16px));
     padding: 6px 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--ps-surface-primary, var(--surface-primary, #0d0d0d));
     border: 1px solid var(--ps-border, var(--border, #2a2a2a));
     border-radius: var(--ps-radius-md, 10px);

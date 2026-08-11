@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import styles from './dropdownMenu.module.scss'
@@ -28,6 +28,8 @@ export interface DropdownMenuItem {
     checked?: boolean
 }
 
+export type DropdownMenuPlacement = 'bottom-start' | 'bottom-end' | 'right-start' | 'left-start'
+
 export interface DropdownMenuProps {
     /** Menu items */
     items: DropdownMenuItem[]
@@ -37,8 +39,16 @@ export interface DropdownMenuProps {
     className?: string
     /** Additional className on the menu panel */
     menuClassName?: string
+    /** Called after the menu opens or finishes closing */
+    onOpenChange?: (open: boolean) => void
     /** Alignment relative to trigger */
     align?: 'left' | 'right'
+    /**
+     * Menu placement relative to the trigger. Side placements automatically
+     * flip when the preferred side has insufficient viewport space.
+     * `align` remains supported as the legacy bottom-placement API.
+     */
+    placement?: DropdownMenuPlacement
     /**
      * Submenu mode:
      * - `'hover'` (default) — submenus fly out to the side on hover
@@ -99,38 +109,40 @@ function HoverMenuItem({
     onClose,
     openDirection,
     closeOnSelect,
+    isOpen,
+    isClosing,
+    onActivate,
+    onDeactivate,
+    onSubAnimationEnd,
 }: {
     item: DropdownMenuItem
     onClose: () => void
     openDirection: 'right' | 'left'
     closeOnSelect: boolean
+    isOpen: boolean
+    isClosing: boolean
+    onActivate: (key: string | null) => void
+    onDeactivate: (key: string) => void
+    onSubAnimationEnd: (event: React.AnimationEvent<HTMLDivElement>) => void
 }) {
-    const [subOpen, setSubOpen] = useState(false)
-    const [subClosing, setSubClosing] = useState(false)
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const itemRef = useRef<HTMLDivElement>(null)
     const subRef = useRef<HTMLDivElement>(null)
 
     const hasChildren = item.children && item.children.length > 0
-    const showSub = subOpen || subClosing
     const isLeft = openDirection === 'left'
 
     const openSub = () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
-        setSubClosing(false)
-        setSubOpen(true)
+        onActivate(hasChildren ? item.key : null)
     }
 
     const closeSub = () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
-        if (subOpen) setSubClosing(true)
+        onDeactivate(item.key)
     }
 
-    const handleSubAnimEnd = () => {
-        if (subClosing) { setSubClosing(false); setSubOpen(false) }
-    }
-
-    const handleMouseEnter = () => { if (hasChildren) openSub() }
+    const handleMouseEnter = () => openSub()
 
     /* When mouse leaves the parent .item entirely (to outside), schedule close */
     const handleItemLeave = (e: React.MouseEvent) => {
@@ -179,7 +191,7 @@ function HoverMenuItem({
         <span className={clsx(
             styles.itemChevron,
             isLeft && styles.itemChevronLeft,
-            (subOpen && !subClosing) && styles.itemChevronOpen,
+            isOpen && !isClosing && styles.itemChevronOpen,
         )}>
             {isLeft ? <ChevronLeft /> : <ChevronRight />}
         </span>
@@ -192,8 +204,7 @@ function HoverMenuItem({
                 className={clsx(
                     styles.item,
                     item.disabled && styles.itemDisabled,
-                    (subOpen && !subClosing) && styles.itemActive,
-                    isLeft && styles.itemReverse,
+                    isOpen && styles.itemActive,
                 )}
                 onClick={handleClick}
                 onMouseEnter={handleMouseEnter}
@@ -210,27 +221,107 @@ function HoverMenuItem({
                 {/* Right-direction: chevron on the right */}
                 {!isLeft && chevronEl}
 
-                {showSub && hasChildren && (
+                {isOpen && hasChildren && (
                     <div
                         ref={subRef}
                         className={clsx(
                             styles.submenu,
                             isLeft && styles.submenuLeft,
-                            subClosing && (isLeft ? styles.submenuClosingLeft : styles.submenuClosing),
+                            isClosing && (isLeft ? styles.submenuClosingLeft : styles.submenuClosing),
                         )}
-                        onAnimationEnd={handleSubAnimEnd}
+                        onAnimationEnd={onSubAnimationEnd}
                         onMouseEnter={openSub}
                         onMouseLeave={handleSubLeave}
                     >
-                        {item.children!.map(child => (
-                            <HoverMenuItem key={child.key} item={child} onClose={onClose} openDirection={openDirection} closeOnSelect={closeOnSelect} />
-                        ))}
+                        <HoverMenuLevel items={item.children!} onClose={onClose} openDirection={openDirection} closeOnSelect={closeOnSelect} />
                     </div>
                 )}
             </div>
             {item.divider && <div className={styles.divider} />}
         </>
     )
+}
+
+function HoverMenuLevel({
+    items,
+    onClose,
+    openDirection,
+    closeOnSelect,
+}: {
+    items: DropdownMenuItem[]
+    onClose: () => void
+    openDirection: 'right' | 'left'
+    closeOnSelect: boolean
+}) {
+    const [activeKey, setActiveKey] = useState<string | null>(null)
+    const [closing, setClosing] = useState(false)
+    const activeKeyRef = useRef<string | null>(null)
+    const pendingKeyRef = useRef<string | null>(null)
+    const closingRef = useRef(false)
+
+    const updateActiveKey = useCallback((key: string | null) => {
+        activeKeyRef.current = key
+        setActiveKey(key)
+    }, [])
+
+    const updatePendingKey = useCallback((key: string | null) => {
+        pendingKeyRef.current = key
+    }, [])
+
+    const updateClosing = useCallback((value: boolean) => {
+        closingRef.current = value
+        setClosing(value)
+    }, [])
+
+    const activate = useCallback((key: string | null) => {
+        const currentKey = activeKeyRef.current
+
+        if (key === currentKey) {
+            updatePendingKey(null)
+            updateClosing(false)
+            return
+        }
+
+        if (currentKey !== null) {
+            updatePendingKey(key)
+            updateClosing(true)
+            return
+        }
+
+        updateActiveKey(key)
+    }, [updateActiveKey, updateClosing, updatePendingKey])
+
+    const deactivate = useCallback((key: string) => {
+        // Item leave is delayed. Read current refs so an older timer cannot
+        // cancel a submenu selected by a newer sibling hover.
+        if (activeKeyRef.current === key && pendingKeyRef.current === null) {
+            activate(null)
+        }
+    }, [activate])
+
+    const handleSubAnimationEnd = useCallback((event: React.AnimationEvent<HTMLDivElement>) => {
+        if (event.target !== event.currentTarget || !closingRef.current) return
+
+        const nextKey = pendingKeyRef.current
+        updateActiveKey(nextKey)
+        updatePendingKey(null)
+        updateClosing(false)
+    }, [updateActiveKey, updateClosing, updatePendingKey])
+
+    return items.map(item => (
+        <HoverMenuItem
+            key={item.key}
+            item={item}
+            onClose={onClose}
+            openDirection={openDirection}
+            closeOnSelect={closeOnSelect}
+            isOpen={activeKey === item.key}
+            isClosing={activeKey === item.key && closing}
+            onActivate={activate}
+            onDeactivate={deactivate}
+            onSubAnimationEnd={handleSubAnimationEnd}
+        />
+    ))
 }
 
 /* ═══════════════════════════════════════════════
@@ -342,7 +433,9 @@ export function DropdownMenu({
     children,
     className,
     menuClassName,
+    onOpenChange,
     align = 'left',
+    placement,
     mode = 'hover',
     closeOnSelect = true,
 }: DropdownMenuProps) {
@@ -350,50 +443,105 @@ export function DropdownMenu({
     const [closing, setClosing] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({})
+    const [openDirection, setOpenDirection] = useState<'right' | 'left'>(align === 'right' ? 'left' : 'right')
     const wrapRef = useRef<HTMLDivElement>(null)
     const triggerRef = useRef<HTMLDivElement>(null)
     const menuRef = useRef<HTMLDivElement>(null)
 
     const showMenu = open || closing
+    const resolvedPlacement = placement ?? (align === 'right' ? 'bottom-end' : 'bottom-start')
 
     useEffect(() => setMounted(true), [])
 
     const updatePosition = useCallback(() => {
-        const el = triggerRef.current
-        if (!el) return
-        const rect = el.getBoundingClientRect()
+        const trigger = triggerRef.current
+        const menu = menuRef.current
+        if (!trigger || !menu) return
+
+        const rect = trigger.getBoundingClientRect()
+        const menuRect = menu.getBoundingClientRect()
+        const menuWidth = menuRect.width
+        const menuHeight = menuRect.height
+        const viewportWidth = window.innerWidth
+        const viewportHeight = window.innerHeight
+        const gap = 6
+        const viewportPadding = 8
+        const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max))
+
+        let left = rect.left
+        let top = rect.bottom + gap
+        let actualSide: 'right' | 'left' | 'bottom' = 'bottom'
+
+        if (resolvedPlacement === 'right-start' || resolvedPlacement === 'left-start') {
+            const preferRight = resolvedPlacement === 'right-start'
+            const fitsRight = rect.right + gap + menuWidth <= viewportWidth - viewportPadding
+            const fitsLeft = rect.left - gap - menuWidth >= viewportPadding
+            const useRight = preferRight ? (fitsRight || !fitsLeft) : (!fitsLeft && fitsRight)
+
+            actualSide = useRight ? 'right' : 'left'
+            left = useRight ? rect.right + gap : rect.left - gap - menuWidth
+            top = rect.top
+        } else {
+            left = resolvedPlacement === 'bottom-end' ? rect.right - menuWidth : rect.left
+
+            const fitsBelow = rect.bottom + gap + menuHeight <= viewportHeight - viewportPadding
+            const fitsAbove = rect.top - gap - menuHeight >= viewportPadding
+            top = !fitsBelow && fitsAbove ? rect.top - gap - menuHeight : rect.bottom + gap
+        }
+
+        left = clamp(left, viewportPadding, viewportWidth - menuWidth - viewportPadding)
+        top = clamp(top, viewportPadding, viewportHeight - menuHeight - viewportPadding)
+
         const style: React.CSSProperties = {
             position: 'fixed',
-            top: rect.bottom + 4,
+            top,
+            left,
             zIndex: 10100,
         }
-        if (align === 'right') {
-            style.right = window.innerWidth - rect.right
-        } else {
-            style.left = rect.left
-        }
+
+        const rightSpace = viewportWidth - (left + menuWidth)
+        const leftSpace = left
+        const nextDirection = actualSide === 'left' || (actualSide === 'bottom' && leftSpace > rightSpace) ? 'left' : 'right'
+
         setMenuStyle(style)
-    }, [align])
+        setOpenDirection(nextDirection)
+    }, [resolvedPlacement])
+
+    useLayoutEffect(() => {
+        if (open) updatePosition()
+    }, [open, items, updatePosition])
 
     useEffect(() => {
         if (!open) return
         updatePosition()
         window.addEventListener('scroll', updatePosition, true)
         window.addEventListener('resize', updatePosition)
+
+        const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updatePosition)
+        if (triggerRef.current) resizeObserver?.observe(triggerRef.current)
+        if (menuRef.current) resizeObserver?.observe(menuRef.current)
+
         return () => {
             window.removeEventListener('scroll', updatePosition, true)
             window.removeEventListener('resize', updatePosition)
+            resizeObserver?.disconnect()
         }
     }, [open, updatePosition])
 
     const closeMenu = useCallback(() => {
-        if (!open) return
+        if (!open || closing) return
         setClosing(true)
-    }, [open])
+    }, [closing, open])
 
-    const handleAnimEnd = useCallback(() => {
-        if (closing) { setClosing(false); setOpen(false) }
-    }, [closing])
+    const handleAnimEnd = useCallback((event: React.AnimationEvent<HTMLDivElement>) => {
+        // Submenu animations bubble through the portal menu. Only the main
+        // panel's own animation may finish the main panel close lifecycle.
+        if (event.target !== event.currentTarget || !closing) return
+
+        setClosing(false)
+        setOpen(false)
+        onOpenChange?.(false)
+    }, [closing, onOpenChange])
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -414,9 +562,20 @@ export function DropdownMenu({
         return () => document.removeEventListener('keydown', handler)
     }, [open, closeMenu])
 
-    const toggle = () => { if (open) closeMenu(); else setOpen(true) }
+    const toggle = () => {
+        if (closing) {
+            setClosing(false)
+            return
+        }
 
-    const openDirection = align === 'right' ? 'left' : 'right'
+        if (open) {
+            closeMenu()
+            return
+        }
+
+        setOpen(true)
+        onOpenChange?.(true)
+    }
 
     const menuContent = showMenu && (
         <div
@@ -425,7 +584,7 @@ export function DropdownMenu({
                 styles.menu,
                 styles.menuPortal,
                 closing && styles.menuClosing,
-                align === 'right' && styles.menuRight,
+                openDirection === 'left' && styles.menuRight,
                 mode === 'drill' && styles.menuDrill,
                 menuClassName,
             )}
@@ -435,9 +594,7 @@ export function DropdownMenu({
             {mode === 'drill' ? (
                 <DrillPanel items={items} onClose={closeMenu} closeOnSelect={closeOnSelect} />
             ) : (
-                items.map(item => (
-                    <HoverMenuItem key={item.key} item={item} onClose={closeMenu} openDirection={openDirection} closeOnSelect={closeOnSelect} />
-                ))
+                <HoverMenuLevel items={items} onClose={closeMenu} openDirection={openDirection} closeOnSelect={closeOnSelect} />
             )}
         </div>
     )
