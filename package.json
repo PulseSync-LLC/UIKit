@@ -1,6 +1,6 @@
 {
   "name": "@pulsesync/uikit",
-  "version": "2.0.0",
+  "version": "2.1.5",
   "description": "PulseSync UI Kit — shared component library for PulseSync apps",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -67,7 +67,7 @@
   "dependencies": {
     "@xyflow/react": "^12.10.2",
     "clsx": "^2.1.1",
-    "react-is": ">=19.2.5"
+    "react-is": ">=16.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
